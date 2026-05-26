@@ -32,7 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "study_manager_database" // Nome do ficheiro da base de dados no sistema
                 )
-                    .fallbackToDestructiveMigration() // Se mudarmos a estrutura (versão 2), limpa e recria
+                    .fallbackToDestructiveMigration(dropAllTables = true) // Se mudarmos a estrutura, limpa e recria
                     .build()
                 INSTANCE = instance
                 instance
