@@ -22,16 +22,15 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
     val subjects by viewModel.allSubjects.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
-    // Variável para guardar a matéria a ser editada
     var subjectToEdit by remember { mutableStateOf<Subject?>(null) }
 
+    // NOVA VARIÁVEL
     var itemToDelete by remember { mutableStateOf<Subject?>(null) }
-
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Matérias") },
+                title = { Text("Minhas Matérias") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
@@ -59,7 +58,7 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
-                            .clickable { subjectToEdit = subject } // Tocar no cartão abre a edição
+                            .clickable { subjectToEdit = subject }
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -70,9 +69,13 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
                                 Text(text = subject.description, style = MaterialTheme.typography.bodyMedium)
                             }
 
-                            // Botão de Eliminar
-                            IconButton(onClick = { itemToDelete = subject }) { // Abre o diálogo de confirmação
-                                Icon(Icons.Filled.Delete, contentDescription = "Apagar", tint = MaterialTheme.colorScheme.error)
+                            // BOTÃO ALTERADO
+                            IconButton(onClick = { itemToDelete = subject }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Apagar Matéria",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }
@@ -81,28 +84,33 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
         }
     }
 
+    // NOVA JANELA DE CONFIRMAÇÃO DE DELETAR
     if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text("Confirmar exclusão") },
-            text = { Text("Tem certeza de que deseja apagar este item? Esta ação não pode ser desfeita.") },
+            text = { Text("Tem certeza de que deseja apagar a matéria '${itemToDelete?.name}'? ATENÇÃO: Isso também vai apagar todas as tarefas e provas associadas a ela!") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteSubject(itemToDelete!!)
                         itemToDelete = null
                     }
-                ) { Text("Apagar", color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text("Apagar", color = MaterialTheme.colorScheme.error)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { itemToDelete = null }) { Text("Cancelar") }
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("Cancelar")
+                }
             }
         )
     }
-    // Janela Pop-up para Criar ou Editar
+
+    // Janela Pop-up para Criar ou Editar (Continua igual)
     if (showDialog || subjectToEdit != null) {
 
-        // Preenche os campos se estiver a editar, ou deixa em branco se for nova
         var name by remember(subjectToEdit) { mutableStateOf(subjectToEdit?.name ?: "") }
         var description by remember(subjectToEdit) { mutableStateOf(subjectToEdit?.description ?: "") }
 
@@ -135,12 +143,10 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
                     onClick = {
                         if (name.isNotBlank()) {
                             if (subjectToEdit == null) {
-                                // Criar nova matéria
                                 viewModel.insertSubject(
                                     Subject(name = name, description = description, colorCode = "#FF5733")
                                 )
                             } else {
-                                // Atualizar matéria existente
                                 viewModel.updateSubject(
                                     subjectToEdit!!.copy(name = name, description = description)
                                 )
@@ -150,7 +156,7 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
                         }
                     }
                 ) {
-                    Text("Guardar")
+                    Text("Salvar")
                 }
             },
             dismissButton = {

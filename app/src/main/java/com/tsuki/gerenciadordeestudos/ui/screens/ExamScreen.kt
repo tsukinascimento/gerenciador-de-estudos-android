@@ -9,17 +9,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -35,103 +37,105 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.dp
-import com.tsuki.gerenciadordeestudos.data.entity.Task
+import com.tsuki.gerenciadordeestudos.data.entity.Exam
+import com.tsuki.gerenciadordeestudos.ui.viewmodel.ExamViewModel
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.SubjectViewModel
-import com.tsuki.gerenciadordeestudos.ui.viewmodel.TaskViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel) {
+fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel) {
 
-    val tasks by taskViewModel.allTasks.collectAsState()
+    val exams by examViewModel.allExams.collectAsState()
     val subjects by subjectViewModel.allSubjects.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
-    var taskToEdit by remember { mutableStateOf<Task?>(null) }
+    var examToEdit by remember { mutableStateOf<Exam?>(null) }
+    var itemToDelete by remember { mutableStateOf<Exam?>(null) }
 
-    // AQUI ESTÁ A NOVA VARIÁVEL: Guarda a tarefa que será deletada
-    var itemToDelete by remember { mutableStateOf<Task?>(null) }
+    // Formatador para transformar o código da data (Long) em algo legível como "25/12/2026"
+    val dateFormat = remember {
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Minhas Tarefas") },
+                title = { Text("Minhas Provas") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.secondary,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.tertiary,
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Adicionar Tarefa")
+                Icon(Icons.Filled.Add, contentDescription = "Adicionar Prova")
             }
         }
     ) { paddingValues ->
 
-        if (tasks.isEmpty()) {
+        if (exams.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("Nenhuma tarefa pendente. Excelente!")
+                Text("Nenhuma prova agendada. Relaxe!")
             }
         } else {
             LazyColumn(
                 contentPadding = paddingValues,
                 modifier = Modifier.fillMaxSize().padding(16.dp)
             ) {
-                items(tasks) { task ->
-                    val subjectName = subjects.find { it.id == task.subjectId }?.name ?: "Sem matéria"
+                items(exams) { exam ->
+                    val subjectName = subjects.find { it.id == exam.subjectId }?.name ?: "Sem matéria"
 
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
-                            .clickable { taskToEdit = task }
+                            .clickable { examToEdit = exam }
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp).fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = {
-                                taskViewModel.updateTask(task.copy(isCompleted = !task.isCompleted))
-                            }) {
-                                Icon(
-                                    imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                                    contentDescription = "Concluir Tarefa",
-                                    tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            // Ícone de calendário decorativo
+                            Icon(
+                                imageVector = Icons.Filled.DateRange,
+                                contentDescription = "Data da Prova",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(32.dp)
+                            )
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
+                                Text(text = exam.title, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    text = task.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "$subjectName - ${task.description}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "$subjectName • ${dateFormat.format(Date(exam.examDate))}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
-                            // AQUI ESTÁ A MUDANÇA NO BOTÃO: Ao invés de deletar, ele apenas marca a tarefa
-                            IconButton(onClick = { itemToDelete = task }) {
+                            IconButton(onClick = { itemToDelete = exam }) {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Apagar Tarefa",
+                                    contentDescription = "Apagar Prova",
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -142,17 +146,17 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
         }
     }
 
-    // AQUI ESTÁ A NOVA JANELA DE CONFIRMAÇÃO DE DELETAR
+    // JANELA DE CONFIRMAÇÃO DE DELETAR
     if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text("Confirmar exclusão") },
-            text = { Text("Tem certeza de que deseja apagar a tarefa '${itemToDelete?.title}'? Esta ação não pode ser desfeita.") },
+            text = { Text("Tem certeza de que deseja apagar a prova '${itemToDelete?.title}'?") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        taskViewModel.deleteTask(itemToDelete!!)
-                        itemToDelete = null // Fecha a janela após deletar
+                        examViewModel.deleteExam(itemToDelete!!)
+                        itemToDelete = null
                     }
                 ) {
                     Text("Apagar", color = MaterialTheme.colorScheme.error)
@@ -166,39 +170,57 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
         )
     }
 
-    // Janela Pop-up para Criar ou Editar (Continua igual)
-    if (showDialog || taskToEdit != null) {
-        var title by remember(taskToEdit) { mutableStateOf(taskToEdit?.title ?: "") }
-        var description by remember(taskToEdit) { mutableStateOf(taskToEdit?.description ?: "") }
+    // Janela Pop-up para Criar ou Editar Prova
+    if (showDialog || examToEdit != null) {
+        var title by remember(examToEdit) { mutableStateOf(examToEdit?.title ?: "") }
+        var selectedDateMillis by remember(examToEdit) { mutableLongStateOf(examToEdit?.examDate ?: System.currentTimeMillis()) }
+
         var expanded by remember { mutableStateOf(false) }
-        var selectedSubject by remember(taskToEdit) {
-            mutableStateOf(subjects.find { it.id == taskToEdit?.subjectId })
+        var selectedSubject by remember(examToEdit) {
+            mutableStateOf(subjects.find { it.id == examToEdit?.subjectId })
+        }
+
+        // Variável que controla se o calendário está aberto
+        var showDatePicker by remember { mutableStateOf(false) }
+
+        // O Calendário Interativo (DatePicker)
+        if (showDatePicker) {
+            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        // Salva a data escolhida (ou a atual se der erro)
+                        selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                        showDatePicker = false
+                    }) { Text("Confirmar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
         }
 
         AlertDialog(
             onDismissRequest = {
                 showDialog = false
-                taskToEdit = null
+                examToEdit = null
             },
-            title = { Text(if (taskToEdit == null) "Nova Tarefa" else "Editar Tarefa") },
+            title = { Text(if (examToEdit == null) "Nova Prova" else "Editar Prova") },
             text = {
                 Column {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Título da Tarefa") },
+                        label = { Text("Assunto / Título da Prova") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Descrição") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Menu de Matérias (Igual ao das Tarefas)
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = it }
@@ -232,32 +254,48 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // NOVO: Campo de Data (Clica e abre o calendário)
+                    OutlinedTextField(
+                        value = dateFormat.format(Date(selectedDateMillis)),
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("Data da Prova") },
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(Icons.Filled.DateRange, contentDescription = "Selecionar Data")
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDatePicker = true } // Abre o calendário ao tocar em qualquer lugar do campo
+                    )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (title.isNotBlank() && selectedSubject != null) {
-                            if (taskToEdit == null) {
-                                taskViewModel.insertTask(
-                                    Task(
+                            if (examToEdit == null) {
+                                examViewModel.insertExam(
+                                    Exam(
                                         title = title,
-                                        description = description,
-                                        subjectId = selectedSubject!!.id,
-                                        dueDate = System.currentTimeMillis()
+                                        examDate = selectedDateMillis,
+                                        subjectId = selectedSubject!!.id
                                     )
                                 )
                             } else {
-                                taskViewModel.updateTask(
-                                    taskToEdit!!.copy(
+                                examViewModel.updateExam(
+                                    examToEdit!!.copy(
                                         title = title,
-                                        description = description,
+                                        examDate = selectedDateMillis,
                                         subjectId = selectedSubject!!.id
                                     )
                                 )
                             }
                             showDialog = false
-                            taskToEdit = null
+                            examToEdit = null
                         }
                     }
                 ) {
@@ -267,7 +305,7 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
             dismissButton = {
                 TextButton(onClick = {
                     showDialog = false
-                    taskToEdit = null
+                    examToEdit = null
                 }) {
                     Text("Cancelar")
                 }
