@@ -1,15 +1,9 @@
 package com.tsuki.gerenciadordeestudos.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -17,34 +11,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.tsuki.gerenciadordeestudos.data.entity.Subject
 import com.tsuki.gerenciadordeestudos.data.entity.Task
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.SubjectViewModel
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.TaskViewModel
@@ -58,8 +32,6 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
 
     var showDialog by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
-
-    // AQUI ESTÁ A NOVA VARIÁVEL: Guarda a tarefa que será deletada
     var itemToDelete by remember { mutableStateOf<Task?>(null) }
 
     Scaffold(
@@ -88,61 +60,101 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
                 contentPadding = paddingValues,
                 modifier = Modifier.fillMaxSize().padding(16.dp)
             ) {
-                items(tasks) { task ->
+                items(items = tasks, key = { it.id }) { task ->
                     val subjectName = subjects.find { it.id == task.subjectId }?.name ?: "Sem matéria"
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clickable { taskToEdit = task }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = {
-                                taskViewModel.updateTask(task.copy(isCompleted = !task.isCompleted))
-                            }) {
-                                Icon(
-                                    imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                                    contentDescription = "Concluir Tarefa",
-                                    tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                    // NOVA FORMA OFICIAL DO COMPOSE PARA O SWIPE
+                    val dismissState = rememberSwipeToDismissBoxState()
 
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = task.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "$subjectName - ${task.description}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            // AQUI ESTÁ A MUDANÇA NO BOTÃO: Ao invés de deletar, ele apenas marca a tarefa
-                            IconButton(onClick = { itemToDelete = task }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Apagar Tarefa",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                    // Observador: Fica de olho no estado do arrasto
+                    LaunchedEffect(dismissState.currentValue) {
+                        // Se o cartão for arrastado para fora do lugar...
+                        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+                            itemToDelete = task // 1. Abre a janela de confirmação de lixo
+                            dismissState.reset() // 2. Manda o cartão voltar para o lugar visualmente
                         }
                     }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            val color by animateColorAsState(
+                                targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) {
+                                    MaterialTheme.colorScheme.errorContainer
+                                } else {
+                                    Color.Transparent
+                                }, label = "cor_fundo_swipe"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(bottom = 8.dp)
+                                    .background(color, shape = MaterialTheme.shapes.medium)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Apagar",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        },
+                        content = {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .clickable { taskToEdit = task }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(onClick = {
+                                        taskViewModel.updateTask(task.copy(isCompleted = !task.isCompleted))
+                                    }) {
+                                        Icon(
+                                            imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                                            contentDescription = "Concluir Tarefa",
+                                            tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = task.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
+                                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "$subjectName - ${task.description}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    IconButton(onClick = { itemToDelete = task }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Delete,
+                                            contentDescription = "Apagar Tarefa",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
             }
         }
     }
 
-    // AQUI ESTÁ A NOVA JANELA DE CONFIRMAÇÃO DE DELETAR
+    // JANELA DE CONFIRMAÇÃO DE DELETAR
     if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
@@ -152,7 +164,7 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
                 TextButton(
                     onClick = {
                         taskViewModel.deleteTask(itemToDelete!!)
-                        itemToDelete = null // Fecha a janela após deletar
+                        itemToDelete = null
                     }
                 ) {
                     Text("Apagar", color = MaterialTheme.colorScheme.error)
@@ -166,7 +178,7 @@ fun TaskScreen(taskViewModel: TaskViewModel, subjectViewModel: SubjectViewModel)
         )
     }
 
-    // Janela Pop-up para Criar ou Editar (Continua igual)
+    // Janela Pop-up para Criar ou Editar
     if (showDialog || taskToEdit != null) {
         var title by remember(taskToEdit) { mutableStateOf(taskToEdit?.title ?: "") }
         var description by remember(taskToEdit) { mutableStateOf(taskToEdit?.description ?: "") }

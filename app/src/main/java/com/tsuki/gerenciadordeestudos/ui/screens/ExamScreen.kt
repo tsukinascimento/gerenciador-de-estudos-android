@@ -1,60 +1,61 @@
 package com.tsuki.gerenciadordeestudos.ui.screens
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tsuki.gerenciadordeestudos.data.entity.Exam
+import com.tsuki.gerenciadordeestudos.data.receiver.ExamNotificationReceiver
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.ExamViewModel
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.SubjectViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+
+// NOVO: Função responsável por ir ao sistema do telemóvel e cravar o alarme
+fun scheduleExamNotification(context: Context, examTitle: String) {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    // Criamos uma carta (Intent) com o destino do nosso Mensageiro
+    val intent = Intent(context, ExamNotificationReceiver::class.java).apply {
+        putExtra("EXAM_TITLE", examTitle) // Colocamos o nome da prova na carta
+    }
+
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        System.currentTimeMillis().toInt(), // ID único para não sobrepor alarmes
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // MAGIA DE TESTE: O alarme vai tocar 5 SEGUNDOS depois de salvar a prova!
+    // (Para um app real, usaríamos: tempoDaProva - 86400000 para avisar 1 dia antes)
+    val triggerTime = System.currentTimeMillis() + 5000
+
+    try {
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+    } catch (e: SecurityException) {
+        alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,14 +64,16 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
     val exams by examViewModel.allExams.collectAsState()
     val subjects by subjectViewModel.allSubjects.collectAsState()
 
+    // Apanhamos o "Contexto" (A ligação do ecrã com o sistema Android)
+    val context = LocalContext.current
+
     var showDialog by remember { mutableStateOf(false) }
     var examToEdit by remember { mutableStateOf<Exam?>(null) }
     var itemToDelete by remember { mutableStateOf<Exam?>(null) }
 
-    // Formatador para transformar o código da data (Long) em algo legível como "25/12/2026"
     val dateFormat = remember {
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
-            timeZone = java.util.TimeZone.getTimeZone("UTC")
+            timeZone = TimeZone.getTimeZone("UTC")
         }
     }
 
@@ -100,53 +103,75 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                 contentPadding = paddingValues,
                 modifier = Modifier.fillMaxSize().padding(16.dp)
             ) {
-                items(exams) { exam ->
+                items(items = exams, key = { it.id }) { exam ->
                     val subjectName = subjects.find { it.id == exam.subjectId }?.name ?: "Sem matéria"
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clickable { examToEdit = exam }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Ícone de calendário decorativo
-                            Icon(
-                                imageVector = Icons.Filled.DateRange,
-                                contentDescription = "Data da Prova",
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(32.dp)
-                            )
+                    // SWIPE-TO-DISMISS APLICADO ÀS PROVAS
+                    val dismissState = rememberSwipeToDismissBoxState()
 
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = exam.title, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    text = "$subjectName • ${dateFormat.format(Date(exam.examDate))}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            IconButton(onClick = { itemToDelete = exam }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Apagar Prova",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+                            itemToDelete = exam
+                            dismissState.reset()
                         }
                     }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            val color by animateColorAsState(
+                                targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) MaterialTheme.colorScheme.errorContainer else Color.Transparent,
+                                label = "cor_fundo"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(bottom = 8.dp)
+                                    .background(color, shape = MaterialTheme.shapes.medium)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                            ) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Apagar", tint = MaterialTheme.colorScheme.onErrorContainer)
+                            }
+                        },
+                        content = {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .clickable { examToEdit = exam }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.DateRange,
+                                        contentDescription = "Data da Prova",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = exam.title, style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            text = "$subjectName • ${dateFormat.format(Date(exam.examDate))}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = { itemToDelete = exam }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Apagar", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
             }
         }
     }
 
-    // JANELA DE CONFIRMAÇÃO DE DELETAR
     if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
@@ -158,39 +183,27 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                         examViewModel.deleteExam(itemToDelete!!)
                         itemToDelete = null
                     }
-                ) {
-                    Text("Apagar", color = MaterialTheme.colorScheme.error)
-                }
+                ) { Text("Apagar", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { itemToDelete = null }) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { itemToDelete = null }) { Text("Cancelar") }
             }
         )
     }
 
-    // Janela Pop-up para Criar ou Editar Prova
     if (showDialog || examToEdit != null) {
         var title by remember(examToEdit) { mutableStateOf(examToEdit?.title ?: "") }
         var selectedDateMillis by remember(examToEdit) { mutableLongStateOf(examToEdit?.examDate ?: System.currentTimeMillis()) }
-
         var expanded by remember { mutableStateOf(false) }
-        var selectedSubject by remember(examToEdit) {
-            mutableStateOf(subjects.find { it.id == examToEdit?.subjectId })
-        }
-
-        // Variável que controla se o calendário está aberto
+        var selectedSubject by remember(examToEdit) { mutableStateOf(subjects.find { it.id == examToEdit?.subjectId }) }
         var showDatePicker by remember { mutableStateOf(false) }
 
-        // O Calendário Interativo (DatePicker)
         if (showDatePicker) {
             val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
                     TextButton(onClick = {
-                        // Salva a data escolhida (ou a atual se der erro)
                         selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
                         showDatePicker = false
                     }) { Text("Confirmar") }
@@ -198,9 +211,7 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
                 }
-            ) {
-                DatePicker(state = datePickerState)
-            }
+            ) { DatePicker(state = datePickerState) }
         }
 
         AlertDialog(
@@ -220,7 +231,6 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Menu de Matérias (Igual ao das Tarefas)
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = it }
@@ -236,27 +246,19 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
                         ) {
-                            if (subjects.isEmpty()) {
+                            subjects.forEach { subject ->
                                 DropdownMenuItem(
-                                    text = { Text("Crie uma matéria primeiro!") },
-                                    onClick = { expanded = false }
+                                    text = { Text(subject.name) },
+                                    onClick = {
+                                        selectedSubject = subject
+                                        expanded = false
+                                    }
                                 )
-                            } else {
-                                subjects.forEach { subject ->
-                                    DropdownMenuItem(
-                                        text = { Text(subject.name) },
-                                        onClick = {
-                                            selectedSubject = subject
-                                            expanded = false
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // NOVO: Campo de Data (Clica e abre o calendário)
                     OutlinedTextField(
                         value = dateFormat.format(Date(selectedDateMillis)),
                         onValueChange = { },
@@ -267,9 +269,7 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                                 Icon(Icons.Filled.DateRange, contentDescription = "Selecionar Data")
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true } // Abre o calendário ao tocar em qualquer lugar do campo
+                        modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true }
                     )
                 }
             },
@@ -279,36 +279,26 @@ fun ExamScreen(examViewModel: ExamViewModel, subjectViewModel: SubjectViewModel)
                         if (title.isNotBlank() && selectedSubject != null) {
                             if (examToEdit == null) {
                                 examViewModel.insertExam(
-                                    Exam(
-                                        title = title,
-                                        examDate = selectedDateMillis,
-                                        subjectId = selectedSubject!!.id
-                                    )
+                                    Exam(title = title, examDate = selectedDateMillis, subjectId = selectedSubject!!.id)
                                 )
+                                // NOVO: CHAMAMOS A FUNÇÃO DO ALARME ASSIM QUE SALVAMOS!
+                                scheduleExamNotification(context, title)
                             } else {
                                 examViewModel.updateExam(
-                                    examToEdit!!.copy(
-                                        title = title,
-                                        examDate = selectedDateMillis,
-                                        subjectId = selectedSubject!!.id
-                                    )
+                                    examToEdit!!.copy(title = title, examDate = selectedDateMillis, subjectId = selectedSubject!!.id)
                                 )
                             }
                             showDialog = false
                             examToEdit = null
                         }
                     }
-                ) {
-                    Text("Salvar")
-                }
+                ) { Text("Salvar") }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showDialog = false
                     examToEdit = null
-                }) {
-                    Text("Cancelar")
-                }
+                }) { Text("Cancelar") }
             }
         )
     }

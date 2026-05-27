@@ -1,8 +1,11 @@
 package com.tsuki.gerenciadordeestudos
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -18,12 +21,26 @@ import com.tsuki.gerenciadordeestudos.ui.viewmodel.TaskViewModel
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.TaskViewModelFactory
 
 class MainActivity : ComponentActivity() {
+
+    // NOVO: Criamos o "Lançador" que vai exibir a janela de permissão do sistema
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Se o utilizador negar, não enviamos notificações.
+        // O sistema Android gere a resposta automaticamente, por isso não precisamos de código extra aqui.
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // NOVO: Assim que o aplicativo abre, verificamos a versão do Android.
+        // Se for 13 (TIRAMISU) ou superior, pedimos a permissão na tela.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         val app = application as StudyApplication
 
-        // Inicializamos os 3 cérebros da aplicação
         val subjectViewModel: SubjectViewModel by viewModels {
             SubjectViewModelFactory(app.subjectRepository)
         }
@@ -40,7 +57,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Agora chamamos o Menu Mestre em vez de apenas o ecrã de matérias
                     MainScreen(
                         subjectViewModel = subjectViewModel,
                         taskViewModel = taskViewModel,
