@@ -19,7 +19,9 @@ import com.tsuki.gerenciadordeestudos.ui.viewmodel.TaskViewModel
 fun MainScreen(
     subjectViewModel: SubjectViewModel,
     taskViewModel: TaskViewModel,
-    examViewModel: ExamViewModel
+    examViewModel: ExamViewModel,
+    isDarkTheme: Boolean, // NOVO
+    onThemeToggle: () -> Unit // NOVO
 ) {
     val navController = rememberNavController()
 
@@ -28,15 +30,16 @@ fun MainScreen(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = ScreenRoute.Dashboard.route, // AGORA INICIA NO DASHBOARD
+            startDestination = ScreenRoute.Dashboard.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Rota 0: Dashboard (NOVO)
             composable(ScreenRoute.Dashboard.route) {
                 DashboardScreen(
                     subjectViewModel = subjectViewModel,
                     taskViewModel = taskViewModel,
-                    examViewModel = examViewModel
+                    examViewModel = examViewModel,
+                    isDarkTheme = isDarkTheme, // Passa para o Dashboard
+                    onThemeToggle = onThemeToggle // Passa o botão
                 )
             }
             // Rota 1: Matérias

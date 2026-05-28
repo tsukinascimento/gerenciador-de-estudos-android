@@ -16,11 +16,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,7 +51,9 @@ import androidx.compose.runtime.remember
 fun DashboardScreen(
     subjectViewModel: SubjectViewModel,
     taskViewModel: TaskViewModel,
-    examViewModel: ExamViewModel
+    examViewModel: ExamViewModel,
+    isDarkTheme: Boolean, // NOVO
+    onThemeToggle: () -> Unit // NOVO
 ) {
     // Observa todos os dados em tempo real
     val subjects by subjectViewModel.allSubjects.collectAsState()
@@ -77,7 +82,16 @@ fun DashboardScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
-                )
+                ),
+                // NOVO: Adiciona o botão no canto direito da barra superior!
+                actions = {
+                    IconButton(onClick = onThemeToggle) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                            contentDescription = "Trocar Tema"
+                        )
+                    }
+                }
             )
         }
     ) { paddingValues ->
