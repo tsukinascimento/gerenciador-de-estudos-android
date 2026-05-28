@@ -30,7 +30,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-// NOVO: Função responsável por ir ao sistema do telemóvel e cravar o alarme
+// Função responsável por ir ao sistema e criar o alarme
 fun scheduleExamNotification(context: Context, examTitle: String) {
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 

@@ -1,5 +1,7 @@
 package com.tsuki.gerenciadordeestudos.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tsuki.gerenciadordeestudos.R
 import com.tsuki.gerenciadordeestudos.data.entity.Subject
 import com.tsuki.gerenciadordeestudos.ui.viewmodel.SubjectViewModel
 
@@ -23,8 +30,6 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
 
     var showDialog by remember { mutableStateOf(false) }
     var subjectToEdit by remember { mutableStateOf<Subject?>(null) }
-
-    // NOVA VARIÁVEL
     var itemToDelete by remember { mutableStateOf<Subject?>(null) }
 
     Scaffold(
@@ -54,28 +59,68 @@ fun SubjectScreen(viewModel: SubjectViewModel) {
                 modifier = Modifier.fillMaxSize().padding(16.dp)
             ) {
                 items(subjects) { subject ->
+
+                    // CARD ESTILO GOOGLE CLASSROOM
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clickable { subjectToEdit = subject }
+                            .padding(bottom = 16.dp) // Um pouco mais de espaço entre os cards
+                            .clickable { subjectToEdit = subject },
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Adiciona uma sombrinha
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = subject.name, style = MaterialTheme.typography.titleLarge)
-                                Text(text = subject.description, style = MaterialTheme.typography.bodyMedium)
+                        Column {
+                            // 1. O CABEÇALHO (BANNER COLORIDO COM IMAGEM)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .background(MaterialTheme.colorScheme.primary) // Fundo da cor primária do app
+                            ) {
+                                // Imagem de fundo (Aqui usei a imagem padrão do Android para testar)
+                                // Depois, posso arrastar qualquer .jpg ou .png para a pasta res/drawable
+                                // e trocar o R.drawable.ic_launcher_background pelo nome da imagem!
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_launcher_background),
+                                    contentDescription = "Capa da Matéria",
+                                    contentScale = ContentScale.Crop, // Corta a imagem para preencher o banner
+                                    modifier = Modifier.fillMaxSize(),
+                                    alpha = 0.2f // Deixa a imagem semi-transparente para o texto ficar legível
+                                )
+
+                                // O Nome da Matéria alinhado no canto inferior esquerdo do banner
+                                Text(
+                                    text = subject.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(16.dp)
+                                )
                             }
 
-                            // BOTÃO ALTERADO
-                            IconButton(onClick = { itemToDelete = subject }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Apagar Matéria",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                            // 2. O CORPO DO CARD (Descrição e Lixeira)
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = subject.description,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                IconButton(onClick = { itemToDelete = subject }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = "Apagar Matéria",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }

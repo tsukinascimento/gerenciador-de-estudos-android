@@ -52,8 +52,8 @@ fun DashboardScreen(
     subjectViewModel: SubjectViewModel,
     taskViewModel: TaskViewModel,
     examViewModel: ExamViewModel,
-    isDarkTheme: Boolean, // NOVO
-    onThemeToggle: () -> Unit // NOVO
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
     // Observa todos os dados em tempo real
     val subjects by subjectViewModel.allSubjects.collectAsState()
